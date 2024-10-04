@@ -27,7 +27,8 @@ def index():
 						separator=Separator(phone=None, word=WORD_SEP, syllable=SYLLABLE_SEP),
 						strip=True,
 						preserve_punctuation=False,
-						njobs=4) 
+						njobs=4)
+
 
 			total_syllables = 0
 			#these two make use of the (unfortunately) very fast python splitting and joining functions to quickly count these regardless in very fast O(n)
@@ -62,5 +63,5 @@ def index():
 	return render_template('index.html', errors=errors, results=results)
 
 if __name__ == '__main__':
-	print(f'Serving on port {SERVING_PORT}!')
-	serve(app, host='127.0.0.1', port={SERVING_PORT})
+	print(f'Serving on port {SERVING_PORT}!', flush=True)
+	serve(app, host='127.0.0.1', port=SERVING_PORT)
