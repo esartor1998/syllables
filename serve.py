@@ -58,7 +58,6 @@ def index():
 
             for line_num, line in enumerate(phonemized, start=1):
                 line_syllables = 0
-                line_words = len(line.split(WORD_SEP))
                 results['left'].append(f'─── Line {line_num} ───\n')
 
                 for word_num, word in enumerate(line.split(WORD_SEP), start=1):
@@ -83,7 +82,7 @@ def index():
             for error in errors:
                 flash(error, "danger")
 
-    return render_template('index.html', form=form, results=results)
+    return render_template('index.html', form=form, results=results, max_input_length=MAX_INPUT_LENGTH)
 
 # ----- Main -----
 if __name__ == '__main__':

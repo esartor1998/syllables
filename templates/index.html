@@ -18,22 +18,23 @@
     <div class="plscenter">
       <div class="container">
         <h1>THE ULTIMATE SYLLABLE COUNTER!!</h1>
-        <h5><small>please ignore that it can't handle words that have multiple potential different-syllable pronunciations like "moped"</small></h5><br>
-        <p><br><br>This makes heavy use of <a href="https://joss.theoj.org/papers/10.21105/joss.03958" target="_blank" rel="noopener noreferrer">phonemizer</a>, all credit to those masterminds!</p><br>
+        <h5><small>please ignore that it can't handle words with multiple possible pronunciations like "moped"</small></h5><br>
+        <p><br>This makes heavy use of <a href="https://joss.theoj.org/papers/10.21105/joss.03958" target="_blank" rel="noopener noreferrer">phonemizer</a>, all credit to those masterminds!</p><br>
 
-        <!-- Flask-WTF form with CSRF protection -->
+        <!-- Flask-WTF form with CSRF -->
         <form role="form" method="POST" action="/">
           {{ form.hidden_tag() }}
           <div class="form-group">
-            {{ form.wordbox(class="form-control", rows="10", cols="30", placeholder="Enter your words!!", autofocus=True) }}
-            <br><br>
+            {{ form.wordbox(class="form-control", id="wordbox", rows="10", cols="30", placeholder="Enter your words!!", autofocus=True) }}
+            <p id="char-count" style="text-align:right; font-size:0.9em; color:#555;">
+              0 / {{ max_input_length }} characters
+            </p>
+            <br>
             {{ form.submit(class="btn btn-default") }}
           </div>
         </form>
 
-        <br>
-
-        <!-- Flash messages for errors -->
+        <!-- Flash messages -->
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
             {% for category, message in messages %}
@@ -62,6 +63,19 @@
 
     <script src="//code.jquery.com/jquery-2.2.1.min.js"></script>
     <script src="//netdna.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
+
+    <!-- Live character counter -->
+    <script>
+      const textarea = document.getElementById('wordbox');
+      const charCount = document.getElementById('char-count');
+      const MAX_LENGTH = {{ max_input_length }};
+
+      textarea.addEventListener('input', () => {
+        const len = textarea.value.length;
+        charCount.textContent = `${len} / ${MAX_LENGTH} characters`;
+        charCount.style.color = len > MAX_LENGTH ? 'red' : '#555';
+      });
+    </script>
   </body>
 </html>
 
