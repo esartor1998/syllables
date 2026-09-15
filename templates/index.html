@@ -1,70 +1,397 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title>Wordcount</title>
+    <meta charset="UTF-8">
+    <title>The Syllable Counter</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link href="//netdna.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css" rel="stylesheet" media="screen">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+
     <style>
-      .container { max-width: 90%; margin: auto; }
-      .plscenter { text-align: center; max-width: 1080px; margin-left: auto; margin-right: auto; }
-      .outerdiv { margin: auto; max-width: 90%; overflow: hidden; }
-      .leftdiv { text-align: right; max-width: 47%; float: left; }
-      .rightdiv { max-width: 47%; float: right; }
-      .flash { padding: 0.5rem 1rem; margin-bottom: 1rem; border-radius: 5px; }
-      .flash-danger { background: #fdd; color: #900; border: 1px solid #900; }
+      :root {
+        --bg: #131d17;
+        --panel: #1b2820;
+        --panel-alt: #203026;
+        --border: #3c4c40;
+        --border-soft: #2a382f;
+        --text: #ece6d6;
+        --text-muted: #a79c85;
+        --accent: #c9a961;
+        --accent-soft: rgba(201, 169, 97, 0.14);
+        --danger-bg: #3a2020;
+        --danger-text: #e6b8ae;
+        --danger-border: #6e3a34;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        background-image:
+          radial-gradient(ellipse at top, rgba(201, 169, 97, 0.05), transparent 60%),
+          repeating-linear-gradient(180deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 3px);
+        color: var(--text);
+        font-family: 'Lora', Georgia, serif;
+        line-height: 1.6;
+        min-height: 100vh;
+        padding: 3rem 1.25rem 4rem;
+      }
+
+      .page {
+        max-width: 860px;
+        margin: 0 auto;
+      }
+
+      header.masthead {
+        text-align: center;
+        margin-bottom: 2.5rem;
+      }
+
+      header.masthead .ornament {
+        color: var(--accent);
+        font-size: 1.1rem;
+        letter-spacing: 0.4em;
+        opacity: 0.75;
+      }
+
+      h1 {
+        font-family: 'Playfair Display', Georgia, serif;
+        font-weight: 700;
+        font-size: 2.5rem;
+        letter-spacing: 0.02em;
+        margin: 0.5rem 0 0.6rem;
+        color: var(--text);
+      }
+
+      .subtitle {
+        color: var(--text-muted);
+        font-style: italic;
+        font-size: 0.95rem;
+        margin: 0 auto;
+        max-width: 32rem;
+      }
+
+      .credit {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        margin-top: 0.9rem;
+      }
+
+      .credit a {
+        color: var(--accent);
+        text-decoration: none;
+        border-bottom: 1px solid rgba(201, 169, 97, 0.4);
+      }
+      .credit a:hover { border-bottom-color: var(--accent); }
+
+      .rule {
+        border: none;
+        border-top: 1px solid var(--border-soft);
+        margin: 2.25rem 0;
+        position: relative;
+      }
+      .rule::after {
+        content: '❦';
+        position: absolute;
+        top: -0.7rem;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--bg);
+        padding: 0 0.75rem;
+        color: var(--accent);
+        font-size: 0.9rem;
+      }
+
+      .panel {
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        padding: 2rem;
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+      }
+
+      label, .form-label {
+        display: block;
+        font-family: 'Playfair Display', Georgia, serif;
+        font-size: 0.8rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+        margin-bottom: 0.7rem;
+      }
+
+      textarea {
+        width: 100%;
+        background: var(--panel-alt);
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        color: var(--text);
+        font-family: 'Lora', Georgia, serif;
+        font-size: 1rem;
+        padding: 0.9rem 1rem;
+        resize: vertical;
+        transition: border-color 0.15s ease, box-shadow 0.15s ease;
+      }
+      textarea::placeholder { color: var(--text-muted); opacity: 0.6; }
+      textarea:focus {
+        outline: none;
+        border-color: var(--accent);
+        box-shadow: 0 0 0 3px var(--accent-soft);
+      }
+
+      #char-count {
+        text-align: right;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        margin: 0.5rem 0 0;
+      }
+      #char-count.char-count-over { color: var(--danger-text); }
+
+      .btn-submit {
+        margin-top: 1.4rem;
+        background: transparent;
+        color: var(--accent);
+        border: 1px solid var(--accent);
+        border-radius: 3px;
+        padding: 0.65rem 1.9rem;
+        font-family: 'Playfair Display', Georgia, serif;
+        font-size: 0.85rem;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        cursor: pointer;
+        transition: background 0.15s ease, color 0.15s ease;
+      }
+      .btn-submit:hover {
+        background: var(--accent);
+        color: var(--bg);
+      }
+
+      .flash {
+        padding: 0.75rem 1.1rem;
+        margin-bottom: 1.25rem;
+        border-radius: 3px;
+        font-size: 0.92rem;
+      }
+      .flash-danger {
+        background: var(--danger-bg);
+        color: var(--danger-text);
+        border: 1px solid var(--danger-border);
+      }
+
+      .results-heading {
+        font-family: 'Playfair Display', Georgia, serif;
+        font-size: 1.05rem;
+        font-weight: 600;
+        color: var(--text);
+        text-align: center;
+        margin: 0 0 1.75rem;
+      }
+      .results-heading small {
+        display: block;
+        font-family: 'Lora', Georgia, serif;
+        font-weight: 400;
+        font-style: italic;
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        margin-top: 0.35rem;
+      }
+
+      .results-grid {
+        display: grid;
+        grid-template-columns: 1.4fr 1fr;
+        gap: 1.5rem;
+      }
+
+      .results-col {
+        background: var(--panel-alt);
+        border: 1px solid var(--border-soft);
+        border-radius: 3px;
+        padding: 1.25rem 1.5rem;
+      }
+
+      .results-col p {
+        margin: 0 0 0.6rem;
+        font-size: 0.92rem;
+        white-space: pre-wrap;
+      }
+      .results-col p:last-child { margin-bottom: 0; }
+
+      .results-col.left p:first-child,
+      .results-col.left p:not(:first-child) {
+        color: var(--text);
+      }
+
+      .line-label {
+        color: var(--accent);
+        font-family: 'Playfair Display', Georgia, serif;
+        letter-spacing: 0.05em;
+      }
+
+      @media (max-width: 640px) {
+        body { padding: 2rem 1rem 3rem; }
+        .panel { padding: 1.25rem; }
+        h1 { font-size: 1.9rem; }
+        .results-grid { grid-template-columns: 1fr; }
+      }
+
+      .bounce-icon {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 40px;
+        height: 51px;
+        pointer-events: none;
+        z-index: 500;
+        filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.45));
+        will-change: transform;
+      }
+      .bounce-icon svg { display: block; width: 100%; height: 100%; }
+
+      .pace-corner {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 34px;
+        height: 34px;
+        padding: 8px;
+        z-index: 600;
+      }
+      .pace-hint {
+        display: inline-block;
+        color: var(--accent);
+        font-size: 0.95rem;
+        opacity: 0.3;
+        transition: opacity 0.2s ease;
+        user-select: none;
+      }
+      .pace-corner:hover .pace-hint { opacity: 0.9; }
+
+      .pace-menu {
+        position: absolute;
+        top: 30px;
+        left: 8px;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 3px;
+        padding: 0.7rem 0.9rem;
+        box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
+        opacity: 0;
+        transform: translateY(-4px);
+        pointer-events: none;
+        transition: opacity 0.15s ease, transform 0.15s ease;
+        white-space: nowrap;
+      }
+      .pace-corner:hover .pace-menu {
+        opacity: 1;
+        transform: translateY(0);
+        pointer-events: auto;
+      }
+      .pace-menu label {
+        margin-bottom: 0.5rem;
+      }
+      .pace-menu .pace-row {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+      .pace-menu input[type="range"] {
+        width: 120px;
+        accent-color: var(--accent);
+      }
+      .pace-menu .pace-value {
+        font-size: 0.78rem;
+        color: var(--text-muted);
+        min-width: 2.4em;
+      }
     </style>
   </head>
   <body>
-    <div class="plscenter">
-      <div class="container">
-        <h1>THE ULTIMATE SYLLABLE COUNTER!!</h1>
-        <h5><small>please ignore that it can't handle words with multiple possible pronunciations like "moped"</small></h5><br>
-        <p><br>This makes heavy use of <a href="https://joss.theoj.org/papers/10.21105/joss.03958" target="_blank" rel="noopener noreferrer">phonemizer</a>, all credit to those masterminds!</p><br>
+    <div class="pace-corner" title="Hover for bounce pace">
+      <span class="pace-hint">❧</span>
+      <div class="pace-menu">
+        <label for="pace-slider">Pace</label>
+        <div class="pace-row">
+          <input type="range" id="pace-slider" min="0.2" max="6" step="0.1" value="1">
+          <span class="pace-value" id="pace-value">1.0&times;</span>
+        </div>
+        <label for="count-slider" style="margin-top: 0.6rem;">Objects</label>
+        <div class="pace-row">
+          <input type="range" id="count-slider" min="1" max="8" step="1" value="3">
+          <span class="pace-value" id="count-value">3</span>
+        </div>
+      </div>
+    </div>
 
-        <!-- Flask-WTF form with CSRF -->
-        <form role="form" method="POST" action="/">
+    <template id="leaf-template">
+      <div class="bounce-icon" aria-hidden="true">
+        <svg viewBox="0 0 100 128" xmlns="http://www.w3.org/2000/svg">
+          <g stroke="#0b0b0b" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+            <polygon points="50,6 14,52 50,40" fill="#3fae6b"/>
+            <polygon points="50,6 86,52 50,40" fill="#4fbfa0"/>
+            <polygon points="14,52 24,98 50,80 50,40" fill="#d9534f"/>
+            <polygon points="86,52 76,98 50,80 50,40" fill="#e8b23d"/>
+            <polygon points="24,98 50,116 50,80" fill="#3a6fd8"/>
+            <polygon points="76,98 50,116 50,80" fill="#4fc7c7"/>
+          </g>
+          <path d="M50,6 C50,6 14,30 14,52 C14,74 24,98 24,98 L50,116 L76,98 C76,98 86,74 86,52 C86,30 50,6 50,6 Z"
+                fill="none" stroke="#0b0b0b" stroke-width="5" stroke-linejoin="round"/>
+          <line x1="50" y1="116" x2="50" y2="126" stroke="#0b0b0b" stroke-width="5" stroke-linecap="round"/>
+        </svg>
+      </div>
+    </template>
+
+    <div class="page">
+      <header class="masthead">
+        <div class="ornament">·  ·  ·</div>
+        <h1>The Syllable Counter</h1>
+        <p class="subtitle">measuring the meter of your words, by apparent pronunciation in American English</p>
+        <p class="credit">please ignore that it can't handle words with multiple possible pronunciations like &ldquo;moped&rdquo;. built with <a href="https://joss.theoj.org/papers/10.21105/joss.03958" target="_blank" rel="noopener noreferrer">phonemizer</a>, all credit to those masterminds.</p>
+      </header>
+
+      <section class="panel">
+        <form method="POST" action="/">
           {{ form.hidden_tag() }}
-          <div class="form-group">
-            {{ form.wordbox(class="form-control", id="wordbox", rows="10", cols="30", placeholder="Enter your words!!", autofocus=True) }}
-            <p id="char-count" style="text-align:right; font-size:0.9em; color:#555;">
-              0 / {{ max_input_length }} characters
-            </p>
-            <br>
-            {{ form.submit(class="btn btn-default") }}
-          </div>
+          <label for="wordbox">{{ form.wordbox.label.text }}</label>
+          {{ form.wordbox(id="wordbox", rows="10", placeholder="Enter your words, one line at a time…", autofocus=True) }}
+          <p id="char-count">0 / {{ max_input_length }} characters</p>
+          {{ form.submit(class="btn-submit") }}
         </form>
 
-        <!-- Flash messages -->
         {% with messages = get_flashed_messages(with_categories=true) %}
           {% if messages %}
-            {% for category, message in messages %}
-              <div class="flash flash-{{ category }}">{{ message }}</div>
-            {% endfor %}
+            <div style="margin-top: 1.5rem;">
+              {% for category, message in messages %}
+                <div class="flash flash-{{ category }}">{{ message }}</div>
+              {% endfor %}
+            </div>
           {% endif %}
         {% endwith %}
+      </section>
 
-        <h4>Syllable analysis using festival based on apparent pronunciation in American English:</h4>
-        <br>
-
-        <div class="outerdiv">
-          <div class="leftdiv">
+      {% if results['left'] or results['right'] %}
+        <hr class="rule">
+        <h2 class="results-heading">
+          Analysis
+          <small>syllable breakdown via the festival backend</small>
+        </h2>
+        <div class="results-grid">
+          <div class="results-col left">
             {% for result in results['left'] %}
               <p>{{ result }}</p>
             {% endfor %}
           </div>
-          <div class="rightdiv">
+          <div class="results-col right">
             {% for result in results['right'] %}
               <p>{{ result }}</p>
             {% endfor %}
           </div>
         </div>
-      </div>
+      {% endif %}
     </div>
 
-    <script src="//code.jquery.com/jquery-2.2.1.min.js"></script>
-    <script src="//netdna.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js"></script>
-
-    <!-- Live character counter -->
     <script>
       const textarea = document.getElementById('wordbox');
       const charCount = document.getElementById('char-count');
@@ -73,9 +400,226 @@
       textarea.addEventListener('input', () => {
         const len = textarea.value.length;
         charCount.textContent = `${len} / ${MAX_LENGTH} characters`;
-        charCount.style.color = len > MAX_LENGTH ? 'red' : '#555';
+        charCount.classList.toggle('char-count-over', len > MAX_LENGTH);
       });
+    </script>
+
+    <script>
+      // bounces a tunable number of leaf icons like DVD screensaver logos.
+      // they bounce off each other, plus a fixed obstacle set: leaf-level
+      // UI controls, panel borders, and the tight rendered bounds of text
+      // (via Range, not the element's padded box). we skip generic wrapper
+      // elements (.page, header, form, .results-grid) on purpose, so the
+      // icons only bounce off things that look solid. new objects
+      // spawn along a screen edge and head inward, like a logo re-entering
+      // after going off-screen
+      (function () {
+        const template = document.getElementById('leaf-template');
+        const speedSlider = document.getElementById('pace-slider');
+        const speedValue = document.getElementById('pace-value');
+        const countSlider = document.getElementById('count-slider');
+        const countValue = document.getElementById('count-value');
+        const ICON_W = 40, ICON_H = 51;
+        const COLLISION_INSET = 4; // shrinks the hitbox so bounces register closer to the drawn edge
+        const BASE_SPEED = 90; // px/sec at pace = 1.0x
+
+        let speedScale = parseFloat(speedSlider.value);
+        speedSlider.addEventListener('input', () => {
+          speedScale = parseFloat(speedSlider.value);
+          speedValue.textContent = speedScale.toFixed(1) + '×';
+        });
+
+        // these leaf-level controls collide using their own border box
+        const elementSelectors = [
+          '.pace-corner', '#wordbox', '.btn-submit',
+          'label[for="wordbox"]', '#char-count', '.ornament', '.flash'
+        ];
+        // text obstacles use the tight rendered bounds, not the element's DOM padding box
+        const textSelectors = [
+          'h1', '.subtitle', '.credit', '.results-heading', '.results-col p'
+        ];
+        // panel borders act as walls
+        const panelSelectors = ['.panel', '.results-col'];
+
+        let obstacles = [];
+
+        function elRect(el) {
+          const r = el.getBoundingClientRect();
+          if (r.width === 0 || r.height === 0) return null;
+          return { left: r.left, top: r.top, right: r.right, bottom: r.bottom };
+        }
+
+        function textRect(el) {
+          const range = document.createRange();
+          range.selectNodeContents(el);
+          const rects = Array.from(range.getClientRects()).filter(r => r.width > 0 && r.height > 0);
+          if (!rects.length) return null;
+          return {
+            left: Math.min(...rects.map(r => r.left)),
+            top: Math.min(...rects.map(r => r.top)),
+            right: Math.max(...rects.map(r => r.right)),
+            bottom: Math.max(...rects.map(r => r.bottom))
+          };
+        }
+
+        function collectObstacles() {
+          const list = [];
+          elementSelectors.forEach(sel => {
+            document.querySelectorAll(sel).forEach(el => {
+              const r = elRect(el);
+              if (r) list.push(r);
+            });
+          });
+          textSelectors.forEach(sel => {
+            document.querySelectorAll(sel).forEach(el => {
+              const r = textRect(el);
+              if (r) list.push(r);
+            });
+          });
+          panelSelectors.forEach(sel => {
+            document.querySelectorAll(sel).forEach(el => {
+              const r = elRect(el);
+              if (r) list.push(r);
+            });
+          });
+          obstacles = list;
+        }
+
+        collectObstacles();
+        window.addEventListener('resize', collectObstacles);
+        if (window.ResizeObserver) {
+          new ResizeObserver(collectObstacles).observe(document.body);
+        }
+        if (document.fonts && document.fonts.ready) {
+          document.fonts.ready.then(collectObstacles);
+        }
+        // we also poll on an interval to catch layout shifts with no
+        // dedicated hook, e.g. the textarea's manual drag-resize handle
+        setInterval(collectObstacles, 1000);
+
+        const objects = [];
+
+        function spawnObject() {
+          const el = template.content.firstElementChild.cloneNode(true);
+          document.body.appendChild(el);
+
+          const maxX = window.innerWidth - ICON_W;
+          const maxY = window.innerHeight - ICON_H;
+          const edge = Math.floor(Math.random() * 4);
+          let x, y, dirX, dirY;
+          if (edge === 0) { x = 0; y = Math.random() * maxY; dirX = 1; dirY = Math.random() * 2 - 1; }
+          else if (edge === 1) { x = maxX; y = Math.random() * maxY; dirX = -1; dirY = Math.random() * 2 - 1; }
+          else if (edge === 2) { x = Math.random() * maxX; y = 0; dirX = Math.random() * 2 - 1; dirY = 1; }
+          else { x = Math.random() * maxX; y = maxY; dirX = Math.random() * 2 - 1; dirY = -1; }
+
+          const len = Math.hypot(dirX, dirY) || 1;
+          objects.push({ el, x, y, dir: { x: dirX / len, y: dirY / len } });
+        }
+
+        function despawnObject() {
+          const obj = objects.pop();
+          if (obj) obj.el.remove();
+        }
+
+        function setObjectCount(n) {
+          while (objects.length < n) spawnObject();
+          while (objects.length > n) despawnObject();
+        }
+
+        countSlider.addEventListener('input', () => {
+          const n = parseInt(countSlider.value, 10);
+          countValue.textContent = String(n);
+          setObjectCount(n);
+        });
+
+        setObjectCount(parseInt(countSlider.value, 10));
+
+        function resolveStaticCollisions(obj, rect) {
+          for (const obs of obstacles) {
+            const overlapX = Math.min(rect.right, obs.right) - Math.max(rect.left, obs.left);
+            const overlapY = Math.min(rect.bottom, obs.bottom) - Math.max(rect.top, obs.top);
+            if (overlapX > 0 && overlapY > 0) {
+              if (overlapX < overlapY) {
+                if (rect.left + rect.right < obs.left + obs.right) {
+                  obj.dir.x = -Math.abs(obj.dir.x);
+                  obj.x -= overlapX;
+                } else {
+                  obj.dir.x = Math.abs(obj.dir.x);
+                  obj.x += overlapX;
+                }
+              } else {
+                if (rect.top + rect.bottom < obs.top + obs.bottom) {
+                  obj.dir.y = -Math.abs(obj.dir.y);
+                  obj.y -= overlapY;
+                } else {
+                  obj.dir.y = Math.abs(obj.dir.y);
+                  obj.y += overlapY;
+                }
+              }
+              return;
+            }
+          }
+        }
+
+        function resolvePairwiseCollisions() {
+          for (let i = 0; i < objects.length; i++) {
+            for (let j = i + 1; j < objects.length; j++) {
+              const a = objects[i], b = objects[j];
+              const ar = { left: a.x + COLLISION_INSET, top: a.y + COLLISION_INSET, right: a.x + ICON_W - COLLISION_INSET, bottom: a.y + ICON_H - COLLISION_INSET };
+              const br = { left: b.x + COLLISION_INSET, top: b.y + COLLISION_INSET, right: b.x + ICON_W - COLLISION_INSET, bottom: b.y + ICON_H - COLLISION_INSET };
+              const overlapX = Math.min(ar.right, br.right) - Math.max(ar.left, br.left);
+              const overlapY = Math.min(ar.bottom, br.bottom) - Math.max(ar.top, br.top);
+              if (overlapX > 0 && overlapY > 0) {
+                if (overlapX < overlapY) {
+                  const push = overlapX / 2;
+                  if (a.x < b.x) { a.dir.x = -Math.abs(a.dir.x); b.dir.x = Math.abs(b.dir.x); a.x -= push; b.x += push; }
+                  else { a.dir.x = Math.abs(a.dir.x); b.dir.x = -Math.abs(b.dir.x); a.x += push; b.x -= push; }
+                } else {
+                  const push = overlapY / 2;
+                  if (a.y < b.y) { a.dir.y = -Math.abs(a.dir.y); b.dir.y = Math.abs(b.dir.y); a.y -= push; b.y += push; }
+                  else { a.dir.y = Math.abs(a.dir.y); b.dir.y = -Math.abs(b.dir.y); a.y += push; b.y -= push; }
+                }
+              }
+            }
+          }
+        }
+
+        let last = null;
+        function frame(ts) {
+          if (last === null) last = ts;
+          const dt = Math.min((ts - last) / 1000, 0.05);
+          last = ts;
+
+          const maxX = window.innerWidth - ICON_W;
+          const maxY = window.innerHeight - ICON_H;
+
+          for (const obj of objects) {
+            obj.x += obj.dir.x * BASE_SPEED * speedScale * dt;
+            obj.y += obj.dir.y * BASE_SPEED * speedScale * dt;
+
+            if (obj.x < 0) { obj.x = 0; obj.dir.x = Math.abs(obj.dir.x); }
+            if (obj.x > maxX) { obj.x = maxX; obj.dir.x = -Math.abs(obj.dir.x); }
+            if (obj.y < 0) { obj.y = 0; obj.dir.y = Math.abs(obj.dir.y); }
+            if (obj.y > maxY) { obj.y = maxY; obj.dir.y = -Math.abs(obj.dir.y); }
+
+            resolveStaticCollisions(obj, {
+              left: obj.x + COLLISION_INSET,
+              top: obj.y + COLLISION_INSET,
+              right: obj.x + ICON_W - COLLISION_INSET,
+              bottom: obj.y + ICON_H - COLLISION_INSET
+            });
+          }
+
+          resolvePairwiseCollisions();
+
+          for (const obj of objects) {
+            obj.el.style.transform = `translate(${obj.x}px, ${obj.y}px)`;
+          }
+
+          requestAnimationFrame(frame);
+        }
+        requestAnimationFrame(frame);
+      })();
     </script>
   </body>
 </html>
-
