@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>The Syllable Counter</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 128'%3E%3Cg stroke='%230b0b0b' stroke-width='3' stroke-linejoin='round' stroke-linecap='round'%3E%3Cpolygon points='50,6 14,52 50,40' fill='%233fae6b'/%3E%3Cpolygon points='50,6 86,52 50,40' fill='%234fbfa0'/%3E%3Cpolygon points='14,52 24,98 50,80 50,40' fill='%23d9534f'/%3E%3Cpolygon points='86,52 76,98 50,80 50,40' fill='%23e8b23d'/%3E%3Cpolygon points='24,98 50,116 50,80' fill='%233a6fd8'/%3E%3Cpolygon points='76,98 50,116 50,80' fill='%234fc7c7'/%3E%3C/g%3E%3Cpath d='M50,6 C50,6 14,30 14,52 C14,74 24,98 24,98 L50,116 L76,98 C76,98 86,74 86,52 C86,30 50,6 50,6 Z' fill='none' stroke='%230b0b0b' stroke-width='5' stroke-linejoin='round'/%3E%3Cline x1='50' y1='116' x2='50' y2='126' stroke='%230b0b0b' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -50,12 +51,14 @@
         margin-bottom: 2.5rem;
       }
 
-      header.masthead .ornament {
+      .ornament {
         color: var(--accent);
         font-size: 1.1rem;
         letter-spacing: 0.4em;
         opacity: 0.75;
+        text-align: center;
       }
+      .ornament-footer { margin-top: 2.25rem; }
 
       h1 {
         font-family: 'Playfair Display', Georgia, serif;
@@ -314,12 +317,12 @@
       <div class="pace-menu">
         <label for="pace-slider">Pace</label>
         <div class="pace-row">
-          <input type="range" id="pace-slider" min="0.2" max="6" step="0.1" value="1">
+          <input type="range" id="pace-slider" min="0.2" max="30" step="0.1" value="1">
           <span class="pace-value" id="pace-value">1.0&times;</span>
         </div>
         <label for="count-slider" style="margin-top: 0.6rem;">Objects</label>
         <div class="pace-row">
-          <input type="range" id="count-slider" min="1" max="8" step="1" value="3">
+          <input type="range" id="count-slider" min="1" max="255" step="1" value="3">
           <span class="pace-value" id="count-value">3</span>
         </div>
       </div>
@@ -390,6 +393,8 @@
           </div>
         </div>
       {% endif %}
+
+      <div class="ornament ornament-footer">·  ·  ·</div>
     </div>
 
     <script>
@@ -432,11 +437,15 @@
         // these leaf-level controls collide using their own border box
         const elementSelectors = [
           '.pace-corner', '#wordbox', '.btn-submit',
-          'label[for="wordbox"]', '#char-count', '.ornament', '.flash'
+          'label[for="wordbox"]', '#char-count', '.flash'
         ];
-        // text obstacles use the tight rendered bounds, not the element's DOM padding box
+        // text obstacles use the tight rendered bounds, not the element's DOM
+        // padding box. .ornament has to live here rather than in
+        // elementSelectors: it's a block-level div stretched to its
+        // container's full width, so its own border box is nearly the whole
+        // header, way wider than the few dots actually drawn on the page
         const textSelectors = [
-          'h1', '.subtitle', '.credit', '.results-heading', '.results-col p'
+          'h1', '.subtitle', '.credit', '.results-heading', '.results-col p', '.ornament'
         ];
         // panel borders act as walls
         const panelSelectors = ['.panel', '.results-col'];
@@ -496,6 +505,14 @@
         // we also poll on an interval to catch layout shifts with no
         // dedicated hook, e.g. the textarea's manual drag-resize handle
         setInterval(collectObstacles, 1000);
+
+        // getBoundingClientRect is viewport-relative, so every obstacle's
+        // rect moves the instant the page scrolls. recomputing straight off
+        // the scroll event fires way more often than we render, so we just
+        // flag it dirty here and let the frame loop resync at most once per
+        // frame, right before it checks collisions
+        let obstaclesDirty = false;
+        window.addEventListener('scroll', () => { obstaclesDirty = true; }, { passive: true });
 
         const objects = [];
 
@@ -589,6 +606,11 @@
           if (last === null) last = ts;
           const dt = Math.min((ts - last) / 1000, 0.05);
           last = ts;
+
+          if (obstaclesDirty) {
+            collectObstacles();
+            obstaclesDirty = false;
+          }
 
           const maxX = window.innerWidth - ICON_W;
           const maxY = window.innerHeight - ICON_H;
