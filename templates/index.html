@@ -4,26 +4,60 @@
     <meta charset="UTF-8">
     <title>The Syllable Counter</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#131d17">
+    <meta name="description" content="Count the syllables in each line of your verse, word by word.">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 128'%3E%3Cg stroke='%230b0b0b' stroke-width='3' stroke-linejoin='round' stroke-linecap='round'%3E%3Cpolygon points='50,6 14,52 50,40' fill='%233fae6b'/%3E%3Cpolygon points='50,6 86,52 50,40' fill='%234fbfa0'/%3E%3Cpolygon points='14,52 24,98 50,80 50,40' fill='%23d9534f'/%3E%3Cpolygon points='86,52 76,98 50,80 50,40' fill='%23e8b23d'/%3E%3Cpolygon points='24,98 50,116 50,80' fill='%233a6fd8'/%3E%3Cpolygon points='76,98 50,116 50,80' fill='%234fc7c7'/%3E%3C/g%3E%3Cpath d='M50,6 C50,6 14,30 14,52 C14,74 24,98 24,98 L50,116 L76,98 C76,98 86,74 86,52 C86,30 50,6 50,6 Z' fill='none' stroke='%230b0b0b' stroke-width='5' stroke-linejoin='round'/%3E%3Cline x1='50' y1='116' x2='50' y2='126' stroke='%230b0b0b' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@600;700&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,600;0,700;1,500;1,600&family=Lora:ital,wght@0,400;0,500;0,600;1,400;1,500&display=swap" rel="stylesheet">
 
     <style>
+      /* registered so the counter ring can tween between values. an
+         unregistered custom property snaps, it never animates */
+      @property --fill {
+        syntax: '<number>';
+        inherits: true;
+        initial-value: 0;
+      }
+
       :root {
         --bg: #131d17;
         --panel: #1b2820;
         --panel-alt: #203026;
         --border: #3c4c40;
         --border-soft: #2a382f;
+        --border-strong: #6f8373;   /* control edges, 3:1 against the panel */
         --text: #ece6d6;
         --text-muted: #a79c85;
+        --pencil: #cfc6b0;          /* the marginalia, a shade off the body text */
         --accent: #c9a961;
         --accent-soft: rgba(201, 169, 97, 0.14);
         --danger-bg: #3a2020;
         --danger-text: #e6b8ae;
         --danger-border: #6e3a34;
+        --margin-red: rgba(217, 83, 79, 0.45);
+        --ruled: rgba(201, 169, 97, 0.11);
+        --lamp: rgba(201, 169, 97, 0.07);
+        --lamp-lit: rgba(214, 186, 112, 0.13);
+
+        /* the leaf's own colours, reused for the scansion marks. the blue is
+           lightened from the leaf's #3a6fd8, which only makes 3.2:1 on the
+           panel */
+        --leaf-green: #3fae6b;
+        --leaf-gold: #e8b23d;
+        --leaf-red: #d9534f;
+        --leaf-blue: #6d97ea;
+        --leaf-teal: #4fc7c7;
+
+        --display: 'Playfair Display', Georgia, serif;
+        --body: 'Lora', Georgia, serif;
+
+        /* lets height: auto transition, which is what makes the line
+           breakdowns slide open instead of popping. browsers without it
+           ignore it and pop */
+        interpolate-size: allow-keywords;
       }
 
       * { box-sizing: border-box; }
@@ -35,17 +69,51 @@
           radial-gradient(ellipse at top, rgba(201, 169, 97, 0.05), transparent 60%),
           repeating-linear-gradient(180deg, rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 3px);
         color: var(--text);
-        font-family: 'Lora', Georgia, serif;
+        font-family: var(--body);
         line-height: 1.6;
         min-height: 100vh;
         padding: 3rem 1.25rem 4rem;
       }
 
+      /* a banker's lamp over the desk. it brightens while you're writing,
+         which :has() can tell from up here without any script */
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0 0 auto;
+        height: 70vh;
+        pointer-events: none;
+        z-index: -1;
+        background: radial-gradient(ellipse 60% 100% at 50% 0%, var(--lamp), transparent 70%);
+        transition: background 0.6s ease;
+      }
+      body:has(#wordbox:focus)::before {
+        background: radial-gradient(ellipse 65% 100% at 50% 0%, var(--lamp-lit), transparent 72%);
+      }
+
+      :focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 3px;
+      }
+      [tabindex="-1"]:focus { outline: none; }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip-path: inset(50%);
+        white-space: nowrap;
+      }
+
       .page {
+        position: relative;
+        z-index: 1;                       /* above paused leaves, which drop to z-index 0 */
         max-width: 860px;
         margin: 0 auto;
       }
 
+      /* ---- masthead ---------------------------------------------------------- */
       header.masthead {
         text-align: center;
         margin-bottom: 2.5rem;
@@ -61,43 +129,56 @@
       .ornament-footer { margin-top: 2.25rem; }
 
       h1 {
-        font-family: 'Playfair Display', Georgia, serif;
+        font-family: var(--display);
         font-weight: 700;
-        font-size: 2.5rem;
+        font-size: clamp(2.1rem, 7vw, 2.9rem);
+        line-height: 1.15;
         letter-spacing: 0.02em;
         margin: 0.5rem 0 0.6rem;
-        color: var(--text);
+        color: var(--accent);
+        text-wrap: balance;
+        /* letterpress. a dark edge above and a lit one below read as type
+           pressed into the page, lit from the lamp overhead */
+        text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.6), 0 1px 0 rgba(236, 230, 214, 0.08);
       }
 
       .subtitle {
         color: var(--text-muted);
         font-style: italic;
-        font-size: 0.95rem;
+        font-size: 1rem;
         margin: 0 auto;
         max-width: 32rem;
+        text-wrap: balance;
       }
 
       .credit {
         color: var(--text-muted);
-        font-size: 0.85rem;
-        margin-top: 0.9rem;
+        font-size: 0.88rem;
+        margin: 0.9rem auto 0;
+        max-width: 36rem;
+        text-wrap: pretty;
       }
 
-      .credit a {
+      .credit a, .note a {
         color: var(--accent);
         text-decoration: none;
         border-bottom: 1px solid rgba(201, 169, 97, 0.4);
       }
-      .credit a:hover { border-bottom-color: var(--accent); }
+      .credit a:hover, .note a:hover { border-bottom-color: var(--accent); }
 
       .rule {
         border: none;
         border-top: 1px solid var(--border-soft);
-        margin: 2.25rem 0;
+        margin: 2.5rem 0;
         position: relative;
       }
+      /* the part after the slash is the alt text for generated content. an
+         empty one keeps a screen reader from announcing "floral heart". the
+         first line is for browsers that can't parse the alt syntax and would
+         otherwise drop the whole declaration */
       .rule::after {
-        content: '❦';
+        content: '\2766';
+        content: '\2766' / '';
         position: absolute;
         top: -0.7rem;
         left: 50%;
@@ -108,17 +189,18 @@
         font-size: 0.9rem;
       }
 
+      /* ---- the writing desk -------------------------------------------------- */
       .panel {
         background: var(--panel);
         border: 1px solid var(--border);
         border-radius: 4px;
         padding: 2rem;
-        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35);
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(236, 230, 214, 0.04);
       }
 
       label, .form-label {
         display: block;
-        font-family: 'Playfair Display', Georgia, serif;
+        font-family: var(--display);
         font-size: 0.8rem;
         letter-spacing: 0.14em;
         text-transform: uppercase;
@@ -126,41 +208,120 @@
         margin-bottom: 0.7rem;
       }
 
+      .field-head {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 0.25rem 1rem;
+        margin-bottom: 0.7rem;
+      }
+      .field-head label { margin: 0; color: var(--accent); }
+      .field-hint {
+        margin: 0;
+        font-size: 0.88rem;
+        font-style: italic;
+        color: var(--text-muted);
+      }
+
+      /* a ruled notebook page. the lines are a background sized to exactly
+         one line-height, and background-attachment: local makes them scroll
+         with the text inside the box instead of staying pinned while the
+         words slide past. the lines are tiled with background-size rather
+         than drawn with repeating-linear-gradient, which Firefox renders
+         inside out when a stop is transparent. --rule-h is whole pixels on
+         purpose: at 1.9rem (30.4px) the tiles round unevenly and rules go
+         missing or drift off the baselines */
       textarea {
+        --rule-h: 30px;
+        --rule-top: 8px;                  /* top padding, so the first rule sits under the first line */
+        display: block;
         width: 100%;
-        background: var(--panel-alt);
-        border: 1px solid var(--border);
+        min-height: calc(var(--rule-h) * 8 + var(--rule-top) * 2);
+        max-height: 70vh;
+        background-color: var(--panel-alt);
+        background-image:
+          linear-gradient(90deg, transparent 2.6rem, var(--margin-red) 2.6rem, var(--margin-red) calc(2.6rem + 1px), transparent calc(2.6rem + 1px)),
+          linear-gradient(180deg, transparent calc(var(--rule-h) - 1px), var(--ruled) calc(var(--rule-h) - 1px));
+        background-size: 100% 100%, 100% var(--rule-h);
+        background-position: 0 0, 0 var(--rule-top);
+        background-attachment: local;
+        border: 1px solid var(--border-strong);
         border-radius: 3px;
         color: var(--text);
-        font-family: 'Lora', Georgia, serif;
-        font-size: 1rem;
-        padding: 0.9rem 1rem;
+        caret-color: var(--accent);
+        font-family: var(--body);
+        font-size: 1.06rem;
+        line-height: var(--rule-h);
+        padding: var(--rule-top) 1rem var(--rule-top) 3.4rem;
         resize: vertical;
+        /* grows with the poem where supported, and falls back to the
+           drag handle where not */
+        field-sizing: content;
         transition: border-color 0.15s ease, box-shadow 0.15s ease;
       }
-      textarea::placeholder { color: var(--text-muted); opacity: 0.6; }
+      textarea::placeholder { color: var(--text-muted); opacity: 0.75; font-style: italic; }
       textarea:focus {
         outline: none;
         border-color: var(--accent);
         box-shadow: 0 0 0 3px var(--accent-soft);
       }
+      textarea[aria-invalid="true"] { border-color: var(--danger-text); }
 
-      #char-count {
-        text-align: right;
-        font-size: 0.82rem;
-        color: var(--text-muted);
-        margin: 0.5rem 0 0;
+      .form-foot {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 1rem;
+        margin-top: 1.1rem;
       }
-      #char-count.char-count-over { color: var(--danger-text); }
+
+      /* the counter's ring is a conic-gradient swept by --fill (0 to 1),
+         which script sets as you type. the mask punches out the middle to
+         leave a ring */
+      #char-count {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        margin: 0;
+        font-size: 0.86rem;
+        color: var(--text-muted);
+        font-variant-numeric: tabular-nums;
+        --ring: var(--accent);
+      }
+      #char-count::before {
+        content: '';
+        flex: none;
+        width: 1.25rem;
+        height: 1.25rem;
+        border-radius: 50%;
+        background: conic-gradient(var(--ring) calc(var(--fill) * 1turn), var(--border) 0);
+        mask: radial-gradient(circle, transparent 52%, #000 55%);
+        transition: --fill 0.25s ease;
+      }
+      #char-count.char-count-near { --ring: var(--leaf-gold); color: var(--leaf-gold); }
+      #char-count.char-count-over { --ring: var(--danger-text); color: var(--danger-text); }
+
+      .submit-wrap { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; }
+      .kbd-hint { margin: 0; font-size: 0.8rem; color: var(--text-muted); }
+      kbd {
+        font-family: var(--body);
+        font-size: 0.78rem;
+        padding: 0.05rem 0.35rem;
+        border: 1px solid var(--border-strong);
+        border-bottom-width: 2px;
+        border-radius: 3px;
+      }
 
       .btn-submit {
-        margin-top: 1.4rem;
         background: transparent;
         color: var(--accent);
         border: 1px solid var(--accent);
         border-radius: 3px;
+        min-height: 2.75rem;
         padding: 0.65rem 1.9rem;
-        font-family: 'Playfair Display', Georgia, serif;
+        font-family: var(--display);
         font-size: 0.85rem;
         letter-spacing: 0.12em;
         text-transform: uppercase;
@@ -171,12 +332,28 @@
         background: var(--accent);
         color: var(--bg);
       }
+      .btn-busy { display: none; }
+      form.is-busy .btn-label { display: none; }
+      form.is-busy .btn-busy { display: inline; }
+      form.is-busy .btn-submit { cursor: progress; background: var(--accent-soft); color: var(--accent); }
+      /* the dots are always all there. the clip-path uncovers them one at a
+         time, and steps() makes it tick instead of slide */
+      .dots {
+        display: inline-block;
+        clip-path: inset(0 100% 0 0);
+        animation: dots 1.2s steps(4, jump-none) infinite;
+      }
+      @keyframes dots {
+        to { clip-path: inset(0 0 0 0); }
+      }
 
+      .flash-list { margin-top: 1.5rem; display: grid; gap: 0.6rem; }
+      .flash-list:not(:has(.flash)) { display: none; }
       .flash {
+        margin: 0;
         padding: 0.75rem 1.1rem;
-        margin-bottom: 1.25rem;
         border-radius: 3px;
-        font-size: 0.92rem;
+        font-size: 0.95rem;
       }
       .flash-danger {
         background: var(--danger-bg);
@@ -184,37 +361,306 @@
         border: 1px solid var(--danger-border);
       }
 
+      /* ---- results ----------------------------------------------------------- */
       .results-heading {
-        font-family: 'Playfair Display', Georgia, serif;
-        font-size: 1.05rem;
+        font-family: var(--display);
+        font-size: 1.35rem;
         font-weight: 600;
         color: var(--text);
         text-align: center;
-        margin: 0 0 1.75rem;
+        margin: 0 0 1.5rem;
+        scroll-margin-top: 1.5rem;
       }
       .results-heading small {
         display: block;
-        font-family: 'Lora', Georgia, serif;
+        font-family: var(--body);
         font-weight: 400;
         font-style: italic;
-        font-size: 0.82rem;
+        font-size: 0.88rem;
         color: var(--text-muted);
         margin-top: 0.35rem;
       }
 
+      /* the tallies, set like a ledger's column heads */
+      .ledger {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(8.5rem, 1fr));
+        gap: 1px;
+        margin: 0 0 1.5rem;
+        background: var(--border-soft);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+        overflow: hidden;
+      }
+      .stat {
+        display: flex;
+        flex-direction: column-reverse;
+        align-items: center;
+        padding: 0.9rem 0.5rem 0.8rem;
+        background: var(--panel);
+      }
+      .stat dt {
+        font-family: var(--display);
+        font-size: 0.72rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+      .stat dd {
+        margin: 0;
+        font-family: var(--display);
+        font-size: 2rem;
+        line-height: 1.1;
+        font-variant-numeric: lining-nums tabular-nums;
+        color: var(--text);
+      }
+      .stat-syllables dd { color: var(--accent); }
+
+      .results-layout {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 15rem;
+        gap: 1.5rem;
+        align-items: start;
+      }
+      .results-layout.no-notes { grid-template-columns: minmax(0, 1fr); }
+
+      .lines-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        margin-bottom: 0.6rem;
+      }
+      .lines-head h3 {
+        margin: 0;
+        font-family: var(--display);
+        font-size: 0.8rem;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        font-weight: 600;
+        color: var(--text-muted);
+      }
+      .text-btn {
+        background: none;
+        border: 0;
+        padding: 0.35rem 0.1rem;
+        min-height: 2.75rem;
+        color: var(--accent);
+        font: italic 0.92rem var(--body);
+        cursor: pointer;
+        text-decoration: underline dotted;
+        text-underline-offset: 3px;
+      }
+      .text-btn:hover { text-decoration-style: solid; }
+
+      .lines {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        background: var(--panel);
+        border: 1px solid var(--border);
+        border-radius: 4px;
+      }
+      .verse-line + .verse-line { border-top: 1px solid var(--border-soft); }
+
+      .verse-line summary {
+        display: grid;
+        grid-template-columns: 2.4rem minmax(0, 1fr) auto;
+        grid-template-areas:
+          'no text count'
+          'no marks count';
+        align-items: center;
+        column-gap: 0.75rem;
+        padding: 0.8rem 1rem;
+        cursor: pointer;
+        list-style: none;
+        transition: background 0.15s ease;
+      }
+      .verse-line summary::-webkit-details-marker { display: none; }
+      .verse-line summary:hover { background: rgba(236, 230, 214, 0.03); }
+      .verse-line summary:focus-visible { outline-offset: -2px; }
+
+      /* the line number doubles as the disclosure marker: a small chevron
+         under it turns when the line opens */
+      .line-no {
+        grid-area: no;
+        position: relative;
+        text-align: center;
+        font-family: var(--display);
+        font-style: italic;
+        font-size: 1.2rem;
+        color: var(--accent);
+        line-height: 1;
+        padding-bottom: 0.7rem;
+      }
+      .line-no::after {
+        content: '';
+        position: absolute;
+        left: 50%;
+        bottom: 0;
+        width: 0.4rem;
+        height: 0.4rem;
+        border: solid var(--text-muted);
+        border-width: 0 1.5px 1.5px 0;
+        translate: -50% 0;
+        rotate: -45deg;
+        transition: rotate 0.25s ease;
+      }
+      details[open] > summary .line-no::after { rotate: 45deg; }
+
+      .line-text {
+        grid-area: text;
+        font-size: 1.05rem;
+        overflow-wrap: anywhere;
+      }
+      .line-text.is-blank { color: var(--text-muted); font-style: italic; }
+      .line-count {
+        grid-area: count;
+        text-align: right;
+        font-size: 0.85rem;
+        color: var(--text-muted);
+        white-space: nowrap;
+      }
+      .line-count b {
+        display: block;
+        font-family: var(--display);
+        font-size: 1.6rem;
+        line-height: 1;
+        font-weight: 600;
+        color: var(--text);
+        font-variant-numeric: lining-nums tabular-nums;
+      }
+
+      /* scansion marks, one breve per syllable, grouped by word. a breve is
+         a box with only its bottom border and a rounded bottom, so it
+         curves like a cup. each word takes the next colour off the leaf,
+         which keeps neighbouring words apart at a glance */
+      .scansion {
+        grid-area: marks;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.2rem 0.7rem;
+        margin-top: 0.3rem;
+      }
+      .foot { display: flex; gap: 0.18rem; --mark: var(--leaf-green); }
+      .foot:nth-child(5n+2) { --mark: var(--leaf-gold); }
+      .foot:nth-child(5n+3) { --mark: var(--leaf-red); }
+      .foot:nth-child(5n+4) { --mark: var(--leaf-blue); }
+      .foot:nth-child(5n+5) { --mark: var(--leaf-teal); }
+      .beat {
+        width: 0.62rem;
+        height: 0.34rem;
+        border: 2px solid var(--mark);
+        border-top: 0;
+        border-radius: 0 0 0.62rem 0.62rem;
+      }
+
+      /* the word list slides open. ::details-content is the part of a
+         <details> that hides, and with interpolate-size on :root its
+         height can transition to auto. content-visibility has to ride
+         along with allow-discrete, or the content vanishes before the
+         close finishes */
+      .verse-line details::details-content {
+        block-size: 0;
+        overflow: clip;
+        transition: block-size 0.3s ease, content-visibility 0.3s allow-discrete;
+      }
+      .verse-line details[open]::details-content { block-size: auto; }
+
+      .words {
+        list-style: none;
+        margin: 0;
+        padding: 0 1rem 1rem 4.15rem;
+        display: grid;
+        gap: 0.4rem;
+      }
+      .word {
+        display: grid;
+        grid-template-columns: minmax(6rem, auto) minmax(0, 1fr) auto;
+        align-items: baseline;
+        gap: 0.9rem;
+        padding: 0.4rem 0.7rem;
+        background: var(--panel-alt);
+        border-radius: 3px;
+        border-left: 3px solid var(--mark);
+        --mark: var(--leaf-green);
+      }
+      .word:nth-child(5n+2) { --mark: var(--leaf-gold); }
+      .word:nth-child(5n+3) { --mark: var(--leaf-red); }
+      .word:nth-child(5n+4) { --mark: var(--leaf-blue); }
+      .word:nth-child(5n+5) { --mark: var(--leaf-teal); }
+      .word-src { font-weight: 500; overflow-wrap: anywhere; }
+      .word-src.is-unmatched { color: var(--text-muted); font-style: italic; font-weight: 400; }
+      .phones {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: baseline;
+        gap: 0.2rem;
+        color: var(--pencil);
+        font-size: 0.92rem;
+        font-style: italic;
+      }
+      .syl {
+        padding: 0 0.3rem;
+        border-bottom: 1px solid var(--mark);
+      }
+      .syl-sep { color: var(--text-muted); font-style: normal; }
+      .word-count {
+        font-size: 0.82rem;
+        color: var(--text-muted);
+        white-space: nowrap;
+        font-variant-numeric: tabular-nums;
+      }
+
+      /* pencilled notes in the margin. sticky, so they ride along beside a
+         long poem instead of stranding at the top */
+      .marginalia {
+        position: sticky;
+        top: 1.5rem;
+        margin: 0;
+        padding: 1rem 1.1rem;
+        border-left: 1px solid var(--margin-red);
+        list-style: none;
+        display: grid;
+        gap: 0.9rem;
+      }
+      .marginalia-title {
+        margin: 0;
+        font-family: var(--display);
+        font-size: 0.72rem;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+        color: var(--text-muted);
+      }
+      .note {
+        margin: 0;
+        color: var(--pencil);
+        font-style: italic;
+        font-size: 0.96rem;
+        line-height: 1.45;
+        rotate: -1.2deg;
+        text-wrap: pretty;
+      }
+      .note:nth-child(even) { rotate: 0.8deg; }
+      .note::before {
+        content: '\261E\00A0';
+        content: '\261E\00A0' / '';
+        font-style: normal;
+        color: var(--accent);
+      }
+
+      /* the plain two-column view, kept for the day the server's output
+         changes shape and the template can't read it any more */
       .results-grid {
         display: grid;
         grid-template-columns: 1.4fr 1fr;
         gap: 1.5rem;
       }
-
       .results-col {
         background: var(--panel-alt);
         border: 1px solid var(--border-soft);
         border-radius: 3px;
         padding: 1.25rem 1.5rem;
       }
-
       .results-col p {
         margin: 0 0 0.6rem;
         font-size: 0.92rem;
@@ -222,24 +668,7 @@
       }
       .results-col p:last-child { margin-bottom: 0; }
 
-      .results-col.left p:first-child,
-      .results-col.left p:not(:first-child) {
-        color: var(--text);
-      }
-
-      .line-label {
-        color: var(--accent);
-        font-family: 'Playfair Display', Georgia, serif;
-        letter-spacing: 0.05em;
-      }
-
-      @media (max-width: 640px) {
-        body { padding: 2rem 1rem 3rem; }
-        .panel { padding: 1.25rem; }
-        h1 { font-size: 1.9rem; }
-        .results-grid { grid-template-columns: 1fr; }
-      }
-
+      /* ---- the leaves -------------------------------------------------------- */
       .bounce-icon {
         position: fixed;
         top: 0;
@@ -250,163 +679,490 @@
         z-index: 500;
         filter: drop-shadow(0 3px 6px rgba(0, 0, 0, 0.45));
         will-change: transform;
+        perspective: 200px;
       }
-      .bounce-icon svg { display: block; width: 100%; height: 100%; }
+      /* two motions on the svg, both separate from the translate the physics
+         writes to the wrapper. a slow flutter rocks it side to side, and a
+         turn flips it over on its long axis whenever it changes horizontal
+         direction, so a leaf coming off a wall shows you its other face.
+         the flutter timing comes from script per leaf, so a whole flock
+         doesn't sway in step */
+      .bounce-icon svg {
+        display: block;
+        width: 100%;
+        height: 100%;
+        transform-origin: 50% 60%;
+        animation: flutter var(--flutter-s, 2.6s) ease-in-out var(--flutter-delay, 0s) infinite alternate;
+        transition: transform 0.45s ease;
+      }
+      .bounce-icon.is-flipped svg { transform: rotateY(180deg); }
+      @keyframes flutter {
+        from { rotate: -9deg; }
+        to   { rotate: 9deg; }
+      }
+      /* a paused leaf stays put while the page scrolls under it, so sooner
+         or later it would sit on top of some text. instead they settle
+         behind the page, half faded, peeking out from under the panels */
+      .leaves-paused .bounce-icon { z-index: 0; opacity: 0.5; }
+      .leaves-paused .bounce-icon svg { animation-play-state: paused; }
 
       .pace-corner {
         position: fixed;
         top: 0;
         left: 0;
-        width: 34px;
-        height: 34px;
-        padding: 8px;
+        padding: 6px;
         z-index: 600;
       }
-      .pace-hint {
-        display: inline-block;
-        color: var(--accent);
-        font-size: 0.95rem;
-        opacity: 0.3;
-        transition: opacity 0.2s ease;
-        user-select: none;
+      .pace-toggle {
+        display: grid;
+        place-items: center;
+        width: 44px;
+        height: 44px;
+        padding: 0;
+        background: none;
+        border: 1px solid transparent;
+        border-radius: 50%;
+        cursor: pointer;
+        opacity: 0.45;
+        transition: opacity 0.2s ease, border-color 0.2s ease, rotate 0.4s ease;
       }
-      .pace-corner:hover .pace-hint { opacity: 0.9; }
+      .pace-toggle svg { width: 20px; height: 26px; }
+      .pace-toggle:hover, .pace-toggle:focus-visible, .pace-toggle[aria-expanded="true"] {
+        opacity: 1;
+        border-color: var(--border);
+      }
+      .pace-toggle:hover { rotate: -12deg; }
 
+      /* a popover, so it's a real button that opens it: keyboard and touch
+         reach it, Escape and a click outside close it, and it sits in the
+         top layer above the leaves. the fade in is @starting-style, and the
+         fade out needs display and overlay to transition with allow-discrete
+         so the popover stays in the top layer until it's done */
       .pace-menu {
-        position: absolute;
-        top: 30px;
+        position: fixed;
+        inset: auto;
+        top: 56px;
         left: 8px;
+        margin: 0;
         background: var(--panel);
+        color: var(--text);
         border: 1px solid var(--border);
-        border-radius: 3px;
-        padding: 0.7rem 0.9rem;
+        border-radius: 4px;
+        padding: 0.9rem 1rem 0.6rem;
         box-shadow: 0 10px 24px rgba(0, 0, 0, 0.4);
         opacity: 0;
-        transform: translateY(-4px);
-        pointer-events: none;
-        transition: opacity 0.15s ease, transform 0.15s ease;
-        white-space: nowrap;
+        translate: 0 -6px;
+        transition:
+          opacity 0.18s ease,
+          translate 0.18s ease,
+          overlay 0.18s ease allow-discrete,
+          display 0.18s ease allow-discrete;
       }
-      .pace-corner:hover .pace-menu {
-        opacity: 1;
-        transform: translateY(0);
-        pointer-events: auto;
+      .pace-menu:popover-open { opacity: 1; translate: 0 0; }
+      @starting-style {
+        .pace-menu:popover-open { opacity: 0; translate: 0 -6px; }
       }
-      .pace-menu label {
-        margin-bottom: 0.5rem;
+      .pace-title {
+        margin: 0 0 0.7rem;
+        font-family: var(--display);
+        font-style: italic;
+        font-size: 1.05rem;
+        color: var(--accent);
       }
-      .pace-menu .pace-row {
+      .pace-menu label { margin-bottom: 0.3rem; }
+      .pace-row {
         display: flex;
         align-items: center;
         gap: 0.5rem;
+        margin-bottom: 0.7rem;
       }
       .pace-menu input[type="range"] {
-        width: 120px;
+        width: 140px;
         accent-color: var(--accent);
       }
-      .pace-menu .pace-value {
-        font-size: 0.78rem;
+      .pace-value {
+        font-size: 0.82rem;
         color: var(--text-muted);
-        min-width: 2.4em;
+        min-width: 2.6em;
+        font-variant-numeric: tabular-nums;
+      }
+      #leaf-pause[aria-pressed="true"] { color: var(--text); }
+
+      /* ---- breakpoints and preferences --------------------------------------- */
+      @media (max-width: 720px) {
+        .results-layout { grid-template-columns: minmax(0, 1fr); }
+        .marginalia { position: static; order: -1; border-left: 0; border-top: 1px solid var(--margin-red); }
+      }
+      @media (max-width: 640px) {
+        body { padding: 3.25rem 1rem 3rem; }
+        .panel { padding: 1.25rem; }
+        .results-grid { grid-template-columns: 1fr; }
+        .words { padding-left: 1rem; }
+        .word { grid-template-columns: minmax(0, 1fr) auto; }
+        .phones { grid-column: 1 / -1; grid-row: 2; }
+        textarea { padding-left: 2.4rem; background-image:
+          linear-gradient(90deg, transparent 1.7rem, var(--margin-red) 1.7rem, var(--margin-red) calc(1.7rem + 1px), transparent calc(1.7rem + 1px)),
+          linear-gradient(180deg, transparent calc(var(--rule-h) - 1px), var(--ruled) calc(var(--rule-h) - 1px)); }
+      }
+
+      /* a phone has no Ctrl key to press */
+      @media (pointer: coarse) {
+        .kbd-hint { display: none; }
+      }
+
+      @media (prefers-contrast: more) {
+        :root { --text-muted: #d4ccb8; --pencil: var(--text); --border: var(--border-strong); --ruled: rgba(201, 169, 97, 0.22); }
+        body::before { display: none; }
+      }
+
+      /* high contrast modes swap the palette for system colours and drop
+         backgrounds, so anything drawn only in background or box-shadow
+         needs a real border to survive */
+      @media (forced-colors: active) {
+        .stat, .word, .lines, .pace-toggle { border: 1px solid CanvasText; }
+        .beat { border-color: CanvasText; }
+        #char-count::before { forced-color-adjust: none; background: conic-gradient(Highlight calc(var(--fill) * 1turn), GrayText 0); }
+        .bounce-icon { display: none; }
+      }
+
+      /* with reduced motion on, script starts the leaves paused, and none of
+         the decorative movement runs. the popover and the line breakdowns
+         still open, they just don't glide */
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+        .bounce-icon svg, .dots { animation: none; }
+        .dots { clip-path: none; }
       }
     </style>
   </head>
   <body>
-    <div class="pace-corner" title="Hover for bounce pace">
-      <span class="pace-hint">❧</span>
-      <div class="pace-menu">
+    {% set has_results = results['left'] or results['right'] %}
+
+    {# one copy of the leaf drawing. the settings button and every bouncing
+       leaf point at it with <use>, so 255 leaves don't mean 255 copies of
+       the paths #}
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true" focusable="false">
+      <symbol id="leaf-glyph" viewBox="0 0 100 128">
+        <g stroke="#0b0b0b" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
+          <polygon points="50,6 14,52 50,40" fill="#3fae6b"/>
+          <polygon points="50,6 86,52 50,40" fill="#4fbfa0"/>
+          <polygon points="14,52 24,98 50,80 50,40" fill="#d9534f"/>
+          <polygon points="86,52 76,98 50,80 50,40" fill="#e8b23d"/>
+          <polygon points="24,98 50,116 50,80" fill="#3a6fd8"/>
+          <polygon points="76,98 50,116 50,80" fill="#4fc7c7"/>
+        </g>
+        <path d="M50,6 C50,6 14,30 14,52 C14,74 24,98 24,98 L50,116 L76,98 C76,98 86,74 86,52 C86,30 50,6 50,6 Z"
+              fill="none" stroke="#0b0b0b" stroke-width="5" stroke-linejoin="round"/>
+        <line x1="50" y1="116" x2="50" y2="126" stroke="#0b0b0b" stroke-width="5" stroke-linecap="round"/>
+      </symbol>
+    </svg>
+
+    <div class="pace-corner">
+      <button type="button" class="pace-toggle" popovertarget="pace-menu" aria-label="Leaf settings">
+        <svg viewBox="0 0 100 128" aria-hidden="true" focusable="false"><use href="#leaf-glyph"/></svg>
+      </button>
+      <div id="pace-menu" class="pace-menu" popover role="dialog" aria-labelledby="pace-title">
+        <p id="pace-title" class="pace-title">The leaves</p>
         <label for="pace-slider">Pace</label>
         <div class="pace-row">
           <input type="range" id="pace-slider" min="0.2" max="30" step="0.1" value="1">
-          <span class="pace-value" id="pace-value">1.0&times;</span>
+          <output class="pace-value" id="pace-value" for="pace-slider">1.0&times;</output>
         </div>
-        <label for="count-slider" style="margin-top: 0.6rem;">Objects</label>
+        <label for="count-slider">How many</label>
         <div class="pace-row">
           <input type="range" id="count-slider" min="1" max="255" step="1" value="3">
-          <span class="pace-value" id="count-value">3</span>
+          <output class="pace-value" id="count-value" for="count-slider">3</output>
         </div>
+        <button type="button" id="leaf-pause" class="text-btn" aria-pressed="false">Pause the leaves</button>
       </div>
     </div>
 
     <template id="leaf-template">
       <div class="bounce-icon" aria-hidden="true">
-        <svg viewBox="0 0 100 128" xmlns="http://www.w3.org/2000/svg">
-          <g stroke="#0b0b0b" stroke-width="3" stroke-linejoin="round" stroke-linecap="round">
-            <polygon points="50,6 14,52 50,40" fill="#3fae6b"/>
-            <polygon points="50,6 86,52 50,40" fill="#4fbfa0"/>
-            <polygon points="14,52 24,98 50,80 50,40" fill="#d9534f"/>
-            <polygon points="86,52 76,98 50,80 50,40" fill="#e8b23d"/>
-            <polygon points="24,98 50,116 50,80" fill="#3a6fd8"/>
-            <polygon points="76,98 50,116 50,80" fill="#4fc7c7"/>
-          </g>
-          <path d="M50,6 C50,6 14,30 14,52 C14,74 24,98 24,98 L50,116 L76,98 C76,98 86,74 86,52 C86,30 50,6 50,6 Z"
-                fill="none" stroke="#0b0b0b" stroke-width="5" stroke-linejoin="round"/>
-          <line x1="50" y1="116" x2="50" y2="126" stroke="#0b0b0b" stroke-width="5" stroke-linecap="round"/>
-        </svg>
+        <svg viewBox="0 0 100 128" focusable="false"><use href="#leaf-glyph"/></svg>
       </div>
     </template>
 
     <div class="page">
       <header class="masthead">
-        <div class="ornament">·  ·  ·</div>
+        <div class="ornament" aria-hidden="true">&middot;&nbsp;&nbsp;&middot;&nbsp;&nbsp;&middot;</div>
         <h1>The Syllable Counter</h1>
         <p class="subtitle">measuring the meter of your words, by apparent pronunciation in American English</p>
         <p class="credit">please ignore that it can't handle words with multiple possible pronunciations like &ldquo;moped&rdquo;. built with <a href="https://joss.theoj.org/papers/10.21105/joss.03958" target="_blank" rel="noopener noreferrer">phonemizer</a>, all credit to those masterminds.</p>
       </header>
 
-      <section class="panel">
-        <form method="POST" action="/">
-          {{ form.hidden_tag() }}
-          <label for="wordbox">{{ form.wordbox.label.text }}</label>
-          {{ form.wordbox(id="wordbox", rows="10", placeholder="Enter your words, one line at a time…", autofocus=True) }}
-          <p id="char-count">0 / {{ max_input_length }} characters</p>
-          {{ form.submit(class="btn-submit") }}
-        </form>
-
-        {% with messages = get_flashed_messages(with_categories=true) %}
-          {% if messages %}
-            <div style="margin-top: 1.5rem;">
-              {% for category, message in messages %}
-                <div class="flash flash-{{ category }}">{{ message }}</div>
-              {% endfor %}
+      <main>
+        <section class="panel" aria-label="Your text">
+          <form method="POST" action="/" id="count-form">
+            {{ form.hidden_tag() }}
+            <div class="field-head">
+              <label for="wordbox">Your verse</label>
+              <p class="field-hint" id="wordbox-hint">Each line here is counted as a line of verse.</p>
             </div>
+            {{ form.wordbox(id="wordbox", rows="8", placeholder="Enter your words, one line at a time...", autofocus=(not has_results), aria_describedby="wordbox-hint char-count form-errors", aria_invalid=('true' if form.wordbox.errors else False), spellcheck="false") }}
+            <div class="form-foot">
+              <p id="char-count" aria-live="off">0 / {{ max_input_length }} characters</p>
+              <div class="submit-wrap">
+                <p class="kbd-hint" aria-hidden="true"><kbd id="mod-key">Ctrl</kbd> + <kbd>Enter</kbd></p>
+                <button type="submit" name="{{ form.submit.name }}" value="{{ form.submit.label.text }}" class="btn-submit" aria-keyshortcuts="Control+Enter Meta+Enter">
+                  <span class="btn-label">Count syllables</span>
+                  <span class="btn-busy">Counting<span class="dots">...</span></span>
+                </button>
+              </div>
+            </div>
+            <p id="form-status" class="sr-only" role="status"></p>
+          </form>
+
+          {% with messages = get_flashed_messages(with_categories=true) %}
+            <div id="form-errors" class="flash-list" role="alert">
+              {%- for category, message in messages %}
+                <p class="flash flash-{{ category }}">{{ message }}</p>
+              {%- endfor %}
+            </div>
+          {% endwith %}
+        </section>
+
+        {% if has_results %}
+          {#- the server hands back preformatted strings, not data. we read
+              them back into lines and words here so the page can lay them
+              out properly. this leans on the exact wording in serve.py
+              ('Line N' headers, 'Word N, phones:' entries, 'N syllables in
+              line N', and a three-row totals block), so anything that
+              doesn't match flips ns.ok and we fall back to the plain two
+              columns instead of guessing -#}
+          {% set ns = namespace(line=0, words=[], counts=[], ok=true) %}
+          {% for raw in results['left'] %}
+            {% set text = raw.strip() %}
+            {% if text.startswith('Word ') %}
+              {% set parts = text.rsplit(':', 1) %}
+              {% set head = parts[0].split(', ', 1) %}
+              {% if parts|length == 2 and head|length == 2 and ns.line > 0 %}
+                {% set ns.words = ns.words + [{'line': ns.line, 'phones': head[1], 'count': parts[1].strip().split(' ')[0]|int}] %}
+              {% else %}
+                {% set ns.ok = false %}
+              {% endif %}
+            {% elif 'Line ' in text %}
+              {% set ns.line = ns.line + 1 %}
+            {% else %}
+              {% set ns.ok = false %}
+            {% endif %}
+          {% endfor %}
+          {% for raw in results['right'][:-1] %}
+            {% set ns.counts = ns.counts + [raw.split(' ')[0]|int] %}
+          {% endfor %}
+          {% set totals = (results['right'][-1] if results['right'] else '').splitlines() %}
+          {% if ns.counts|length != ns.line or ns.line == 0 or totals|length != 3 %}
+            {% set ns.ok = false %}
           {% endif %}
-        {% endwith %}
-      </section>
+          {#- phonemizer drops blank lines, so the server's line 2 can be your
+              third line. we keep only the lines with words in them, with
+              their real line numbers, and pair with those. if the count
+              still doesn't match we show no source text rather than the
+              wrong line -#}
+          {% set src = namespace(lines=[]) %}
+          {% for text in (form.wordbox.data or '').splitlines() %}
+            {% if text.strip() %}
+              {% set src.lines = src.lines + [{'no': loop.index, 'text': text}] %}
+            {% endif %}
+          {% endfor %}
+          {% set src_paired = src.lines|length == ns.counts|length %}
 
-      {% if results['left'] or results['right'] %}
-        <hr class="rule">
-        <h2 class="results-heading">
-          Analysis
-          <small>syllable breakdown via the festival backend</small>
-        </h2>
-        <div class="results-grid">
-          <div class="results-col left">
-            {% for result in results['left'] %}
-              <p>{{ result }}</p>
-            {% endfor %}
-          </div>
-          <div class="results-col right">
-            {% for result in results['right'] %}
-              <p>{{ result }}</p>
-            {% endfor %}
-          </div>
-        </div>
-      {% endif %}
+          <hr class="rule">
+          <section class="results" aria-labelledby="results-title">
+            <h2 class="results-heading" id="results-title" tabindex="-1">
+              Analysis
+              <small>syllable breakdown via the festival backend</small>
+            </h2>
 
-      <div class="ornament ornament-footer">·  ·  ·</div>
+            {% if ns.ok %}
+              {% set counts = ns.counts %}
+              {% set word_counts = ns.words|map(attribute='count')|list %}
+              {% set notes = namespace(list=[]) %}
+              {% if counts == [5, 7, 5] %}
+                {% set notes.list = notes.list + ['Five, seven, five. That is a haiku.'] %}
+              {% endif %}
+              {% if counts|length == 14 %}
+                {% set notes.list = notes.list + ['Fourteen lines. Sonnet-shaped, at the very least.'] %}
+              {% endif %}
+              {% if counts|length > 1 and counts|unique|list == [10] %}
+                {% set notes.list = notes.list + ['Ten syllables a line, the count of iambic pentameter. Whether the stresses fall right is between you and your ear.'] %}
+              {% elif counts|length > 1 and counts|unique|list|length == 1 %}
+                {% set notes.list = notes.list + ['Every line runs ' ~ counts[0] ~ ' syllable' ~ ('' if counts[0] == 1 else 's') ~ '. Tidy.'] %}
+              {% endif %}
+              {% set monosyllabic = word_counts and word_counts|max == 1 %}
+
+              <dl class="ledger">
+                <div class="stat"><dt>Lines</dt><dd>{{ counts|length }}</dd></div>
+                <div class="stat"><dt>Words</dt><dd>{{ (totals[1].rsplit(': ', 1)|last)|int }}</dd></div>
+                <div class="stat stat-syllables"><dt>Syllables</dt><dd>{{ (totals[2].rsplit(': ', 1)|last)|int }}</dd></div>
+                <div class="stat"><dt>Characters</dt><dd>{{ (totals[0].rsplit(': ', 1)|last)|int }}</dd></div>
+              </dl>
+
+              <div class="results-layout{% if not (notes.list or monosyllabic) %} no-notes{% endif %}">
+                <div class="lines-wrap">
+                  <div class="lines-head">
+                    <h3>Line by line</h3>
+                    {% if counts|length > 1 %}
+                      <button type="button" class="text-btn" id="toggle-lines" aria-controls="line-list">Open every line</button>
+                    {% endif %}
+                  </div>
+                  <ol class="lines" id="line-list">
+                    {% for count in counts %}
+                      {% set line_words = ns.words|selectattr('line', 'equalto', loop.index)|list %}
+                      {% set line_src = src.lines[loop.index0] if src_paired else none %}
+                      {% set line_no = line_src.no if line_src else loop.index %}
+                      {#- festival reads well-worn as two words, so we split
+                          on hyphens too before lining words up -#}
+                      {% set src_words = line_src.text.replace('-', ' ').split() if line_src else [] %}
+                      {% set paired = src_words|length == line_words|length %}
+                      <li class="verse-line">
+                        <details{% if counts|length <= 4 %} open{% endif %}>
+                          <summary>
+                            <span class="line-no"><span class="sr-only">Line </span>{{ line_no }}</span>
+                            {% if line_src %}
+                              <span class="line-text">{{ line_src.text }}</span>
+                            {% else %}
+                              <span class="line-text is-blank">line {{ line_no }}</span>
+                            {% endif %}
+                            <span class="scansion" aria-hidden="true">
+                              {%- for w in line_words %}<span class="foot">{% for _ in range(w.count) %}<i class="beat"></i>{% endfor %}</span>{% endfor -%}
+                            </span>
+                            <span class="line-count"><b>{{ count }}</b> {{ 'syllable' if count == 1 else 'syllables' }}</span>
+                          </summary>
+                          <ul class="words">
+                            {% for w in line_words %}
+                              <li class="word">
+                                {% if paired %}
+                                  <span class="word-src">{{ src_words[loop.index0] }}</span>
+                                {% else %}
+                                  <span class="word-src is-unmatched">word {{ loop.index }}</span>
+                                {% endif %}
+                                <span class="phones">
+                                  {%- for syl in w.phones.split('·') -%}
+                                    {% if not loop.first %}<span class="syl-sep" aria-hidden="true">&middot;</span>{% endif %}<span class="syl">{{ syl }}</span>
+                                  {%- endfor -%}
+                                </span>
+                                <span class="word-count">{{ w.count }} {{ 'syllable' if w.count == 1 else 'syllables' }}</span>
+                              </li>
+                            {% endfor %}
+                          </ul>
+                        </details>
+                      </li>
+                    {% endfor %}
+                  </ol>
+                </div>
+
+                {% if notes.list or monosyllabic %}
+                  <aside class="marginalia" aria-labelledby="notes-title">
+                    <p class="marginalia-title" id="notes-title">In the margin</p>
+                    {% for note in notes.list %}
+                      <p class="note">{{ note }}</p>
+                    {% endfor %}
+                    {% if monosyllabic %}
+                      <p class="note">Not one word past a single syllable. <a href="https://klrmngr.github.io/poetry-for-neanderthals/">The Neanderthals</a> would be proud.</p>
+                    {% endif %}
+                  </aside>
+                {% endif %}
+              </div>
+            {% else %}
+              <div class="results-grid">
+                <div class="results-col left">
+                  {% for result in results['left'] %}
+                    <p>{{ result }}</p>
+                  {% endfor %}
+                </div>
+                <div class="results-col right">
+                  {% for result in results['right'] %}
+                    <p>{{ result }}</p>
+                  {% endfor %}
+                </div>
+              </div>
+            {% endif %}
+          </section>
+        {% endif %}
+      </main>
+
+      <div class="ornament ornament-footer" aria-hidden="true">&middot;&nbsp;&nbsp;&middot;&nbsp;&nbsp;&middot;</div>
     </div>
 
     <script>
-      const textarea = document.getElementById('wordbox');
-      const charCount = document.getElementById('char-count');
-      const MAX_LENGTH = {{ max_input_length }};
+      (function () {
+        const textarea = document.getElementById('wordbox');
+        const charCount = document.getElementById('char-count');
+        const form = document.getElementById('count-form');
+        const status = document.getElementById('form-status');
+        const MAX_LENGTH = {{ max_input_length }};
+        const NEAR_LIMIT = 0.9; // share of the limit where the ring turns gold as a warning
 
-      textarea.addEventListener('input', () => {
-        const len = textarea.value.length;
-        charCount.textContent = `${len} / ${MAX_LENGTH} characters`;
-        charCount.classList.toggle('char-count-over', len > MAX_LENGTH);
-      });
+        function updateCount() {
+          const len = textarea.value.length;
+          const lines = textarea.value ? textarea.value.split(/\r\n|\r|\n/).length : 0;
+          charCount.textContent = `${lines} ${lines === 1 ? 'line' : 'lines'}, ${len} / ${MAX_LENGTH} characters`;
+          charCount.style.setProperty('--fill', Math.min(len / MAX_LENGTH, 1).toFixed(3));
+          charCount.classList.toggle('char-count-near', len > MAX_LENGTH * NEAR_LIMIT);
+          charCount.classList.toggle('char-count-over', len > MAX_LENGTH);
+        }
+        textarea.addEventListener('input', updateCount);
+        // after a submit the box comes back holding what you sent, so the
+        // count has to start from that. it used to read 0 until you typed
+        updateCount();
+
+        if (/Mac|iPhone|iPad/.test(navigator.platform)) {
+          document.getElementById('mod-key').textContent = 'Cmd';
+        }
+        textarea.addEventListener('keydown', (e) => {
+          if (e.key !== 'Enter' || !(e.ctrlKey || e.metaKey)) return;
+          e.preventDefault();
+          form.requestSubmit(form.querySelector('.btn-submit'));
+        });
+
+        // festival can take a second or two on a long poem. the busy state
+        // shows it's working and swallows the impatient second click that
+        // would send it all again. we don't disable the button, since a
+        // disabled submitter is left out of the form data
+        form.addEventListener('submit', (e) => {
+          if (form.classList.contains('is-busy')) {
+            e.preventDefault();
+            return;
+          }
+          form.classList.add('is-busy');
+          status.textContent = 'Counting syllables.';
+        });
+        // coming back with the back button can restore this page straight
+        // from memory, still mid-submit, so the button would be stuck busy
+        window.addEventListener('pageshow', (e) => {
+          if (e.persisted) form.classList.remove('is-busy');
+        });
+
+        // after a count, take focus and the view to the results, so a
+        // screen reader hears the analysis arrived and nobody has to scroll
+        // hunting for it
+        const resultsTitle = document.getElementById('results-title');
+        if (resultsTitle) {
+          const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+          resultsTitle.focus({ preventScroll: true });
+          resultsTitle.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });
+        }
+
+        const toggleLines = document.getElementById('toggle-lines');
+        if (toggleLines) {
+          const lines = [...document.querySelectorAll('#line-list details')];
+          const sync = () => {
+            toggleLines.textContent = lines.every((d) => d.open) ? 'Close every line' : 'Open every line';
+          };
+          toggleLines.addEventListener('click', () => {
+            const open = !lines.every((d) => d.open);
+            for (const d of lines) d.open = open;
+            sync();
+          });
+          for (const d of lines) d.addEventListener('toggle', sync);
+          sync();
+        }
+      })();
     </script>
 
     <script>
@@ -414,7 +1170,7 @@
       // they bounce off each other, plus a fixed obstacle set: leaf-level
       // UI controls, panel borders, and the tight rendered bounds of text
       // (via Range, not the element's padded box). we skip generic wrapper
-      // elements (.page, header, form, .results-grid) on purpose, so the
+      // elements (.page, header, form, .results-layout) on purpose, so the
       // icons only bounce off things that look solid. new objects
       // spawn along a screen edge and head inward, like a logo re-entering
       // after going off-screen
@@ -424,20 +1180,57 @@
         const speedValue = document.getElementById('pace-value');
         const countSlider = document.getElementById('count-slider');
         const countValue = document.getElementById('count-value');
+        const pauseButton = document.getElementById('leaf-pause');
+        const paceToggle = document.querySelector('.pace-toggle');
+        const paceMenu = document.getElementById('pace-menu');
         const ICON_W = 40, ICON_H = 51;
         const COLLISION_INSET = 4; // shrinks the hitbox so bounces register closer to the drawn edge
         const BASE_SPEED = 90; // px/sec at pace = 1.0x
+        const FLUTTER_MIN_S = 1.8; // shortest half-sway of a leaf's flutter, in seconds
+        const FLUTTER_SPREAD_S = 1.6; // added at random on top, so no two leaves sway in step
+        const SETTINGS_KEY = 'syllables.leaves';
+
+        // pace, count and paused are remembered per browser. storage can be
+        // missing or throw (private windows, blocked site data), which only
+        // costs the memory, so every touch of it is wrapped
+        let saved = {};
+        try { saved = JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}; } catch { /* defaults it is */ }
+        // range inputs clamp whatever they're given to their min and max, so
+        // a stale or hand-edited value can't push past the sliders' limits
+        if (Number.isFinite(saved.pace)) speedSlider.value = String(saved.pace);
+        if (Number.isInteger(saved.count)) countSlider.value = String(saved.count);
+        // moving things you can't stop fail WCAG 2.2.2, so there's a pause,
+        // and with reduced motion asked for we start paused. an explicit
+        // choice made in the menu wins over that default
+        let paused = typeof saved.paused === 'boolean'
+          ? saved.paused
+          : matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+        function saveSettings() {
+          try {
+            localStorage.setItem(SETTINGS_KEY, JSON.stringify({ pace: speedScale, count: objects.length, paused }));
+          } catch { /* not remembered, the leaves still work */ }
+        }
 
         let speedScale = parseFloat(speedSlider.value);
+        speedValue.textContent = speedScale.toFixed(1) + '×';
         speedSlider.addEventListener('input', () => {
           speedScale = parseFloat(speedSlider.value);
           speedValue.textContent = speedScale.toFixed(1) + '×';
         });
+        speedSlider.addEventListener('change', saveSettings);
+
+        // popovertarget handles opening and closing but leaves the button's
+        // aria-expanded alone, so we mirror the popover's state onto it
+        paceToggle.setAttribute('aria-expanded', 'false');
+        paceMenu.addEventListener('toggle', (e) => {
+          paceToggle.setAttribute('aria-expanded', String(e.newState === 'open'));
+        });
 
         // these leaf-level controls collide using their own border box
         const elementSelectors = [
-          '.pace-corner', '#wordbox', '.btn-submit',
-          'label[for="wordbox"]', '#char-count', '.flash'
+          '.pace-corner', '#wordbox', '.btn-submit', '.kbd-hint',
+          'label[for="wordbox"]', '#char-count', '.flash', '.text-btn'
         ];
         // text obstacles use the tight rendered bounds, not the element's DOM
         // padding box. .ornament has to live here rather than in
@@ -445,10 +1238,11 @@
         // container's full width, so its own border box is nearly the whole
         // header, way wider than the few dots actually drawn on the page
         const textSelectors = [
-          'h1', '.subtitle', '.credit', '.results-heading', '.results-col p', '.ornament'
+          'h1', '.subtitle', '.credit', '.results-heading', '.results-col p', '.ornament',
+          '.field-hint', '.lines-head h3', '.marginalia-title', '.note'
         ];
         // panel borders act as walls
-        const panelSelectors = ['.panel', '.results-col'];
+        const panelSelectors = ['.panel', '.results-col', '.ledger', '.lines'];
 
         let obstacles = [];
 
@@ -503,8 +1297,9 @@
           document.fonts.ready.then(collectObstacles);
         }
         // we also poll on an interval to catch layout shifts with no
-        // dedicated hook, e.g. the textarea's manual drag-resize handle
-        setInterval(collectObstacles, 1000);
+        // dedicated hook, e.g. the textarea's manual drag-resize handle.
+        // nothing's moving while paused, so it sits that out
+        setInterval(() => { if (!paused) collectObstacles(); }, 1000);
 
         // getBoundingClientRect is viewport-relative, so every obstacle's
         // rect moves the instant the page scrolls. recomputing straight off
@@ -518,6 +1313,10 @@
 
         function spawnObject() {
           const el = template.content.firstElementChild.cloneNode(true);
+          el.style.setProperty('--flutter-s', (FLUTTER_MIN_S + Math.random() * FLUTTER_SPREAD_S).toFixed(2) + 's');
+          // a negative delay starts the sway partway through, so a leaf
+          // spawned now isn't at the same point in it as the last one
+          el.style.setProperty('--flutter-delay', (-Math.random() * FLUTTER_SPREAD_S).toFixed(2) + 's');
           document.body.appendChild(el);
 
           const maxX = window.innerWidth - ICON_W;
@@ -530,7 +1329,9 @@
           else { x = Math.random() * maxX; y = maxY; dirX = Math.random() * 2 - 1; dirY = -1; }
 
           const len = Math.hypot(dirX, dirY) || 1;
-          objects.push({ el, x, y, dir: { x: dirX / len, y: dirY / len } });
+          const obj = { el, x, y, dir: { x: dirX / len, y: dirY / len }, flipped: false };
+          objects.push(obj);
+          place(obj);
         }
 
         function despawnObject() {
@@ -548,8 +1349,17 @@
           countValue.textContent = String(n);
           setObjectCount(n);
         });
+        countSlider.addEventListener('change', saveSettings);
 
-        setObjectCount(parseInt(countSlider.value, 10));
+        function place(obj) {
+          obj.el.style.transform = `translate(${obj.x}px, ${obj.y}px)`;
+          // only touch the class when the direction flips, not every frame
+          const flipped = obj.dir.x < 0;
+          if (flipped !== obj.flipped) {
+            obj.flipped = flipped;
+            obj.el.classList.toggle('is-flipped', flipped);
+          }
+        }
 
         function resolveStaticCollisions(obj, rect) {
           for (const obs of obstacles) {
@@ -602,6 +1412,7 @@
         }
 
         let last = null;
+        let frameId = 0;
         function frame(ts) {
           if (last === null) last = ts;
           const dt = Math.min((ts - last) / 1000, 0.05);
@@ -634,13 +1445,35 @@
 
           resolvePairwiseCollisions();
 
-          for (const obj of objects) {
-            obj.el.style.transform = `translate(${obj.x}px, ${obj.y}px)`;
-          }
+          for (const obj of objects) place(obj);
 
-          requestAnimationFrame(frame);
+          frameId = requestAnimationFrame(frame);
         }
-        requestAnimationFrame(frame);
+
+        // paused means no frame loop at all, not a loop that skips the maths.
+        // last is reset so the first frame back doesn't see the whole pause
+        // as one giant time step
+        function setPaused(value) {
+          paused = value;
+          pauseButton.setAttribute('aria-pressed', String(paused));
+          document.documentElement.classList.toggle('leaves-paused', paused);
+          if (paused) {
+            cancelAnimationFrame(frameId);
+            frameId = 0;
+          } else if (!frameId) {
+            last = null;
+            collectObstacles();
+            frameId = requestAnimationFrame(frame);
+          }
+        }
+        pauseButton.addEventListener('click', () => {
+          setPaused(!paused);
+          saveSettings();
+        });
+
+        countValue.textContent = countSlider.value;
+        setObjectCount(parseInt(countSlider.value, 10));
+        setPaused(paused);
       })();
     </script>
   </body>
